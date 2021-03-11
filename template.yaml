@@ -155,6 +155,20 @@ Resources:
           Properties:
             Path: /delete
             Method: POST
+  ChimeSdklistMeetingsLambda:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: index.meetings
+      CodeUri: lambda/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Meetings
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /meetings
+            Method: POST
   ChimeSdkAttendeesLambda:
     Type: 'AWS::Serverless::Function'
     Properties:

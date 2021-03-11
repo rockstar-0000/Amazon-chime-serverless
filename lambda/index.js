@@ -131,6 +131,35 @@ const delAttendee = async(title, attendeeId) => {
   return result.Item.Name.S;
 };
 
+const listMeetings = async(playbackURL) => {
+  const filter = {
+    TableName: MEETINGS_TABLE_NAME,
+    FilterExpression: "#PlaybackURL = :PlaybackURL",
+    ExpressionAttributeNames: {
+      "#PlaybackURL": "PlaybackURL",
+    },
+    ExpressionAttributeValues: {
+      ":PlaybackURL": {
+        "S": `${playbackURL}`
+      }
+    }
+  };
+
+  console.info("listMeetings > filter:", JSON.stringify(filter, null, 2));
+
+  const result = await ddb.scan(filter).promise();
+
+  console.info("listMeetings > result:", JSON.stringify(result, null, 2));
+
+  if (!result.Items) {
+    return 'Unknown';
+  }
+
+  console.info("listMeetings > filteredItems:", JSON.stringify(result.Items, null, 2));
+
+  return result.Items;
+};
+
 const getAttendees = async(title) => {
   const filter = {
     TableName: ATTENDEES_TABLE_NAME,
@@ -541,6 +570,40 @@ exports.delete = async(event, context, callback) => {
   callback(null, response);
 };
 
+exports.meetings = async(event, context, callback) => {
+  console.log("meetings event:", JSON.stringify(event, null, 2));
+
+  let payload;
+
+  try {
+    payload = JSON.parse(event.body);
+  } catch (err) {
+    console.log("meetings event > parse payload:", JSON.stringify(err, null, 2));
+    response.statusCode = 500;
+    response.body = JSON.stringify(err);
+    callback(null, response);
+    return;
+  }
+  
+  if (!payload.playbackURL){
+    console.log("meetings event > missing required fields: Must provide playbackURL");
+    response.statusCode = 400;
+    response.body = "Must provide playbackURL";
+    callback(null, response);
+    return;
+  }
+
+  const playbackURL = payload.playbackURL;
+  const meetingsInfo = await listMeetings(playbackURL);
+
+  response.statusCode = 200;
+  response.body = JSON.stringify(meetingsInfo, '', 2);
+  
+  console.info("list meetings event > response:", JSON.stringify(response, null, 2));
+
+  callback(null, response);
+};
+
 exports.attendees = async(event, context, callback) => {
   console.log("attendees event:", JSON.stringify(event, null, 2));
 
@@ -553,6 +616,19 @@ exports.attendees = async(event, context, callback) => {
   }
 
   const title = simplifyTitle(event.queryStringParameters.title);
+  const meetingInfo = await getMeeting(title);
+
+  console.log("+++++++++++++++", meetingInfo);
+
+  if (!meetingInfo){
+    response.statusCode = 200;
+    response.body = JSON.stringify(meetingInfo, '', 2);
+    
+    console.info("attendees event > response:", JSON.stringify(response, null, 2));
+  
+    callback(null, response);
+  }
+
   const attendeeInfo = await getAttendees(title);
 
   response.statusCode = 200;

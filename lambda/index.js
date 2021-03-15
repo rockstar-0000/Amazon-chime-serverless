@@ -46,6 +46,10 @@ const getMeeting = async(meetingTitle) => {
   }
   const meetingData = JSON.parse(result.Item.Data.S);
   meetingData.PlaybackURL = result.Item.PlaybackURL.S;
+  meetingData.AvatarURL = result.Item.AvatarURL.S;
+  meetingData.SubjectName = result.Item.SubjectName.S;
+  meetingData.SubjectDescription = result.Item.SubjectDescription.S;
+
   try {
     await chime.getMeeting({
       MeetingId: meetingData.Meeting.MeetingId
@@ -54,6 +58,7 @@ const getMeeting = async(meetingTitle) => {
     console.info("getMeeting > try/catch:", JSON.stringify(err, null, 2));
     return null;
   }
+
   return meetingData;
 };
 
@@ -64,6 +69,9 @@ const putMeeting = async(title, playbackURL, meetingInfo) => {
       'Title': { S: title },
       'PlaybackURL': { S: playbackURL },
       'Data': { S: JSON.stringify(meetingInfo) },
+      'SubjectName': {S: meetingInfo.SubjectName},
+      'SubjectDescription': {S: meetingInfo.SubjectDescription},
+      'AvatarURL': {S: meetingInfo.AvatarURL},
       'TTL': {
         N: '' + oneDayFromNow
       }
@@ -76,7 +84,7 @@ const endMeeting = async(title) => {
 
   try {
     await chime.deleteMeeting({
-      MeetingId: meetingInfo.Meeting.MeetingId,
+      MeetingId: meetingInfo.meetingData.Meeting.MeetingId,
     }).promise();
   } catch (err) {
     console.info("endMeeting > try/catch:", JSON.stringify(err, null, 2));
@@ -117,6 +125,22 @@ const getAttendee = async(title, attendeeId) => {
 };
 
 const delAttendee = async(title, attendeeId) => {
+  console.log("+++++++++++", title);
+
+  const meetingInfo = await getMeeting(title);
+
+  console.log("++++++++++++++", meetingInfo);
+
+  try {
+    await chime.deleteAttendee({
+      AttendeeId: attendeeId,
+      MeetingId: meetingInfo.meetingData.Meeting.MeetingId
+    }).promise();
+  } catch (err) {
+    console.info("deleteAttendee > try/catch:", JSON.stringify(err, null, 2));
+    // return null;
+  }
+
   const result = await ddb.deleteItem({
     TableName: ATTENDEES_TABLE_NAME,
     Key: {
@@ -417,7 +441,8 @@ exports.createMeeting = async(event, context, callback) => {
     };
     console.info('createMeeting event > Creating new meeting: ' + JSON.stringify(request, null, 2));
     meetingInfo = await chime.createMeeting(request).promise();
-    await putMeeting(title, meetingInfo);
+    // await putMeeting(title, meetingInfo);
+    await putMeeting(title, payload.playbackURL, meetingInfo);
   }
 
   const joinInfo = {
@@ -480,6 +505,9 @@ exports.join = async(event, context, callback) => {
     console.info('join event > Creating new meeting: ' + JSON.stringify(request, null, 2));
     meetingInfo = await chime.createMeeting(request).promise();
     meetingInfo.PlaybackURL = payload.playbackURL;
+    meetingInfo.SubjectName = payload.subjectName;
+    meetingInfo.SubjectDescription = payload.subjectDescription;
+    meetingInfo.AvatarURL = payload.avatarURL;
     await putMeeting(title, payload.playbackURL, meetingInfo);
   }
 
@@ -499,6 +527,9 @@ exports.join = async(event, context, callback) => {
     JoinInfo: {
       Title: title,
       PlaybackURL: meetingInfo.PlaybackURL,
+      AvatarURL: meetingInfo.AvatarURL,
+      SubjectName: meetingInfo.SubjectName,
+      SubjectDescription: meetingInfo.SubjectDescription,
       Meeting: meetingInfo.Meeting,
       Attendee: attendeeInfo.Attendee
     },
@@ -616,18 +647,18 @@ exports.attendees = async(event, context, callback) => {
   }
 
   const title = simplifyTitle(event.queryStringParameters.title);
-  const meetingInfo = await getMeeting(title);
+  // const meetingInfo = await getMeeting(title);
 
-  console.log("+++++++++++++++", meetingInfo);
+  // console.log("+++++++++++++++", meetingInfo);
 
-  if (!meetingInfo){
-    response.statusCode = 200;
-    response.body = JSON.stringify(meetingInfo, '', 2);
+  // if (!meetingInfo){
+  //   response.statusCode = 200;
+  //   response.body = JSON.stringify(meetingInfo, '', 2);
     
-    console.info("attendees event > response:", JSON.stringify(response, null, 2));
+  //   console.info("attendees event > response:", JSON.stringify(response, null, 2));
   
-    callback(null, response);
-  }
+  //   callback(null, response);
+  // }
 
   const attendeeInfo = await getAttendees(title);
 

@@ -42,6 +42,7 @@ Resources:
         - Ref: ChimeSdkEndLambdaRole
         - Ref: ChimeSdkCreateMeetingLambdaRole
         - Ref: AuthorizeFunctionRole
+        - Ref: ChimeSdkdelAttendeeLambdaRole
   Meetings:
     Type: 'AWS::DynamoDB::Table'
     Properties:
@@ -147,6 +148,8 @@ Resources:
       Handler: index.delete
       CodeUri: lambda/
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Meetings
         - DynamoDBCrudPolicy:
             TableName: !Ref Attendees
       Events:
